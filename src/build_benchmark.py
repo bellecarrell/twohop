@@ -126,6 +126,7 @@ def all_relevant_facts_given_list_of_subjects(subjects: list, limit: int = None)
     for i, subject_id in enumerate(subjects):
         if (i+1) % 100 == 0:
             print(f'{i+1}/{len(subjects)}')
+        print(f'subject_id: {subject_id}')
         relevant_relation_ids = ent_to_relation_ids(subject_id)
         for relation_id in relevant_relation_ids:
             relation_enum = Relation.id_to_enum(relation_id)

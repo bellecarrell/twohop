@@ -19,13 +19,14 @@ def build_one_hop_dataset(args):
     
     # # Use entity IDs to get facts, not labels
     # ents = list(ent_label2id_dict.values())
-    ent_fname = '/n/home01/nsaphra/workplace/twohop-1/src/top_entities_by_views_monthly.json'
+    ent_fname = '/n/home01/acarrell/workplace/twohop-1/src/top_entities_by_views_monthly.json'
     ent_dicts = load_json(ent_fname)
     ents = []
     for date in ent_dicts.keys():
         if date.startswith('2020') or date.startswith('2021'):
             ents = ents + [ent_dict['id'] for ent_dict in ent_dicts[date]]
-    
+    print(f'Loaded {len(ents)} entities')
+
     # Use entity IDs to get facts, not labels
     # ents = list(ent_label2id_dict.values())
     if args.num_ents:
@@ -44,9 +45,8 @@ def build_one_hop_dataset(args):
         if i % 100 == 0:
             print(f'At fact {i} of {len(facts)} facts')
     
-
     if args.num_ents or args.num_facts:
-        filename = f'top_ents_{args.num_ents}_entities_{args.num_facts}_facts_each.json'
+        filename = f'top_ents_{args.num_ents}_entities_{args.num_facts}_facts_each_{args.seed}_seed.json'
     else:
         filename = f'top_ents_all_entities_facts.json'
 

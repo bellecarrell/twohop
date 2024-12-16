@@ -70,21 +70,21 @@ for d in data:
 
 print(f'true: {true}')
 print(f'false: {len(data) - true}')
+true = []
+for d in data:
+    if 'Yes' in d['output'] and (d['n_sentences'] == 6):
+        true.append(d['instruction'].strip('Q: If you follow these instructions, do you return to the starting point?'))
 
-# for d in data:
-#     if 'Yes' in d['output'] and (d['n_sentences'] == 4):
-#         true.append(d['instruction'].strip('Q: If you follow these instructions, do you return to the starting point?'))
-
-# # sort based on whether Always face forward is in the instruction
-# true = sorted(true)
+# sort based on whether Always face forward is in the instruction
+true = sorted(true)
 
 # for t in true:
 #     print(t)
 
 # write true to text file
-# with open('/n/home01/acarrell/workplace/twohop-1/src/true_4.txt', 'w') as f:
-#     for t in true:
-#         f.write(t + '\n')
+with open('/n/home01/acarrell/workplace/twohop-1/src/true_6.txt', 'w') as f:
+    for t in true:
+        f.write(t + '\n')
 
 # print(f'instructions: {instructions}')
 # print(f'ff: {ff}')

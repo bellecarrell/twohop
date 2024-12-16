@@ -1,0 +1,59 @@
+Always face forward. Take * step backward. Take * steps forward. Take * steps backward. Take * step backward. Take * steps forward.
+Always face forward. Take * step forward. Take * steps forward. Take * steps backward. Take * steps backward. Take * step forward.
+Always face forward. Take * step forward. Take * steps forward. Take * step backward. Take * steps backward. Take * step backward.
+Always face forward. Take * step right. Take * step right. Take * steps backward. Take * steps forward. Take * steps left.
+Always face forward. Take * steps left. Take * steps right. Take * steps left. Take * steps right. Take * steps right.
+Always face forward. Take * steps backward. Take * steps right. Take * steps forward. Take * steps left. Take * steps right.
+Always face forward. Take * steps right. Take * steps left. Take * steps left. Take * steps right. Take * steps right.
+Always face forward. Take * steps forward. Take * steps forward. Take * steps backward. Take * steps backward. Take * steps forward.
+Always face forward. Take * steps right. Take * step backward. Take * steps left. Take * step forward. Take * steps right.
+Always face forward. Take * steps backward. Take * steps forward. Take * steps backward. Take * steps forward. Take * steps forward.
+Always face forward. Take * steps forward. Take * steps forward. Take * step backward. Take * steps backward. Take * steps backward.
+Always face forward. Take * steps right. Take * steps right. Take * step left. Take * steps left. Take * steps left.
+Always face forward. Take * steps forward. Take * steps forward. Take * steps backward. Take * steps backward. Take * step backward.
+Always face forward. Take * steps backward. Take * steps backward. Take * step backward. Take * steps forward. Take * steps forward.
+Always face forward. Take * steps left. Take * steps right. Take * steps right. Take * steps right. Take * steps left.
+Always face forward. Take * steps left. Take * step left. Take * steps forward. Take * steps right. Take * steps backward.
+Always face forward. Take * steps forward. Take * step left. Take * steps backward. Take * steps backward. Take * step right.
+Always face forward. Take * steps left. Take * steps forward. Take * step forward. Take * steps right. Take * steps backward.
+Always face forward. Take * steps left. Take * steps backward. Take * steps right. Take * steps forward. Take * steps forward.
+
+
+Take * step. Take * steps. Take * steps. Turn around. Take * steps. Turn left.
+Take * step. Take * steps. Turn around. Turn around. Turn around. Take * steps.
+Take * step. Take * steps. Turn around. Take * steps. Take * steps. Turn left.
+Take * steps. Turn around. Take * step. Take * step. Take * step. Take * steps.
+Take * steps. Turn around. Take * steps. Take * steps. Turn around. Turn left.
+Take * steps. Take * steps. Turn around. Take * steps. Turn right. Turn left.
+Take * steps. Take * steps. Take * steps. Turn around. Take * steps. Take * steps.
+Take * steps. Take * steps. Turn around. Take * steps. Turn right. Turn right.
+Take * steps. Take * steps. Turn around. Take * steps. Take * steps. Take * steps.
+Take * steps. Take * steps. Turn around. Take * steps. Take * steps. Take * step.
+Take * steps. Turn around. Take * steps. Turn right. Turn right. Turn around.
+Take * steps. Turn right. Turn right. Take * step. Take * steps. Turn around.
+Take * steps. Turn around. Take * steps. Take * steps. Turn around. Take * steps.
+Take * steps. Take * steps. Take * steps. Turn left. Turn left. Take * steps.
+Take * steps. Turn right. Turn left. Take * steps. Turn around. Take * steps.
+Take * steps. Turn left. Turn left. Take * step. Take * steps. Turn around.
+Take * steps. Turn around. Turn around. Turn around. Take * step. Take * steps.
+Take * steps. Take * steps. Turn around. Take * steps. Take * steps. Turn right.
+Take * steps. Take * steps. Turn right. Turn right. Take * steps. Take * steps.
+Take * steps. Turn left. Turn around. Turn right. Take * steps. Turn left.
+Take * steps. Turn right. Turn right. Take * steps. Turn around. Turn around.
+Take * steps. Turn right. Turn right. Take * steps. Turn right. Turn left.
+
+
+Turn around. Take * steps. Take * steps. Turn around. Take * steps. Turn left.
+Turn left. Take * steps. Take * steps. Turn right. Turn right. Take * steps.
+Turn left. Take * steps. Take * steps. Turn around. Take * step. Take * steps.
+Turn left. Take * steps. Turn around. Take * steps. Take * steps. Turn left.
+Turn left. Take * steps. Turn around. Take * steps. Turn right. Turn around.
+Turn left. Take * steps. Turn right. Turn right. Take * steps. Turn right.
+Turn left. Turn around. Take * steps. Turn around. Take * step. Take * steps.
+Turn left. Turn left. Take * steps. Turn around. Take * steps. Turn left.
+Turn left. Turn right. Take * steps. Take * steps. Turn around. Take * steps.
+Turn right. Take * steps. Take * steps. Turn around. Take * steps. Take * steps.
+Turn right. Take * steps. Take * steps. Turn around. Take * steps. Take * step.
+Turn right. Take * steps. Turn around. Take * steps. Take * steps. Turn left.
+Turn right. Turn right. Take * steps. Turn right. Turn right. Take * steps.
+Turn right. Turn right. Turn left. Take * steps. Turn around. Take * steps.

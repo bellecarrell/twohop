@@ -45,7 +45,7 @@ def evaluation(args):
             data['Accuracy'].append(correct/total)
 
     #TODO update naming
-    DATA_DIR = '/n/holyscratch01/kempner_lab/Everyone/data/twohop'
+    DATA_DIR = '/n/holyscratch01/kempner_lab/Everyone/data/multihop'
     fname = os.path.join(DATA_DIR, f'llama_one_hop_{args.num_eval}.json')
     to_file(fname, data)
     
@@ -53,6 +53,6 @@ def evaluation(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_eval", type=int, default=100)
-    parser.add_argument("--onehop", type=str, default='/n/holyscratch01/kempner_lab/Everyone/data/twohop/top_ents_5000_entities_0_facts_each_10_facts/one_hop_from_two_hop_fom_top_ents_5000_entities_0_facts_each_10_facts_12345.json')
+    parser.add_argument("--onehop", type=str, default='/n/holyscratch01/kempner_lab/Everyone/data/multihop/one_hop_dataset.json')
     #TODO: add two and three hop evaluation
     evaluation(parser.parse_args())

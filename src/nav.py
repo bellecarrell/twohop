@@ -10,6 +10,8 @@ import wandb
 
 import names
 import random
+
+from build_two_hop_training_splits import read_jsonl_file
 class Location:
     def __init__(self, x=0, y=0, heading=0):
         self.x = x
@@ -84,6 +86,33 @@ class Location:
         self.y = 0
         self.heading = 0
 
+def generate_direction(face_forward=True):
+    if face_forward:
+        return random.choice(['forward', 'backward', 'left', 'right'])
+    else:
+        return random.choice(['around', 'left', 'right'])
+
+def generate_complementary_direction(direction):
+    if direction == 'forward' or direction == 'backward':
+        return random.choice(['forward', 'backward'])
+    elif direction == 'left' or direction == 'right':
+        return random.choice(['left', 'right'])
+    else:
+        return None
+
+def generate_steps_instruction(steps, direction):
+    if direction:
+        if steps == 1:
+            instruction = f'Take 1 step {direction}.'
+        else:
+            instruction = f'Take {steps} steps {direction}.'
+    else:
+        if steps == 1:
+            instruction = f'Take 1 step.'
+        else:
+            instruction = f'Take {steps} steps.'
+    return instruction
+
 def generate_instruction(i=0, face_forward=True):
     if face_forward:
         if i == 0:
@@ -109,51 +138,159 @@ def generate_instruction(i=0, face_forward=True):
 
 
 
-def generate_problem(num=3, add_cot=False, face_forward=True, end_at_origin=False):
-    if num != 3:
-        raise ValueError("Only 3 sentence problems are supported at this time.")
+def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=False):
+    if num not in list(range(3, 11)):
+        raise ValueError("Only 3-10 sentence problems are supported at this time.")
     prefix = 'Q: If you follow these instructions, do you return to the starting point?'
     ff = 'Always face forward.'
     location = Location()
     instructions = []
     cot = []
-    if end_at_origin:
-        if face_forward:
-            instructions.append(ff)
-            
-            steps = random.randint(1, 10)
-            direction = random.choice(['forward', 'backward', 'left', 'right'])
-            if steps == 1:
-                instruction = f'Take 1 step {direction}.'
-            else:
-                instruction = f'Take {steps} steps {direction}.'
-            instructions.append(instruction)
-
-            location.update(instruction)
-            instructions.append(location.go_to_origin())
-        else:
-            steps = random.randint(1, 10)
-            if steps == 1:
-                instruction = f'Take 1 step.'
-            else:
-                instruction = f'Take {steps} steps.'
-            instructions.append(instruction)
-            instructions.append('Turn around.')
-            instructions.append(instruction)
-    
-    else:
-        for i in range(num):
-            instruction = generate_instruction(i, face_forward)
-
-            
-            location.update(instruction)
-            if i == num - 1:
-                if location.end_at_origin():
-                    end_at_origin = True
-            instructions.append(instruction)
+    if num == 3:
+        if end_at_origin:
+            if face_forward:
+                instructions.append(ff)
                 
+                steps = random.randint(1, 10)
+                direction = random.choice(['forward', 'backward', 'left', 'right'])
+                if steps == 1:
+                    instruction = f'Take 1 step {direction}.'
+                else:
+                    instruction = f'Take {steps} steps {direction}.'
+                instructions.append(instruction)
+
+                location.update(instruction)
+                instructions.append(location.go_to_origin())
+            else:
+                steps = random.randint(1, 10)
+                if steps == 1:
+                    instruction = f'Take 1 step.'
+                else:
+                    instruction = f'Take {steps} steps.'
+                instructions.append(instruction)
+                instructions.append('Turn around.')
+                instructions.append(instruction)
+        
+        else:
+            for i in range(num):
+                instruction = generate_instruction(i, face_forward)
+
+                
+                location.update(instruction)
+                if i == num - 1:
+                    if location.end_at_origin():
+                        end_at_origin = True
+                instructions.append(instruction)
+    rest = list(range(5, 11))            
+    if num == 4:
+        if end_at_origin:
+            if face_forward:
+                instructions.append(ff)
+                
+                steps = random.randint(1, 10)
+                direction = generate_direction(face_forward)
+                second_direction = generate_complementary_direction(direction)
+                if direction == second_direction:
+                    # To prevent going too far from origin
+                    steps = random.randint(1, 9)
+                    second_steps = random.randint(1, (10 - steps))
+                else:
+                    # To prevent going to origin too early
+                    second_steps = random.choice(list(set([x for x in list(range(1, 11))]) - set([steps])))
+
+                instruction = generate_steps_instruction(steps, direction)
+                instructions.append(instruction)
+                location.update(instruction)
+                instruction = generate_steps_instruction(second_steps, second_direction)
+                instructions.append(instruction)
+                location.update(instruction)
+                instructions.append(location.go_to_origin())
+            else:
+                first_direction_turn = random.choice([True, False])
+                if first_direction_turn:
+                    direction = generate_direction(face_forward)
+                    instructions.append(f'Turn {direction}.')
+                    steps = random.randint(1, 10)
+                    instructions.append(generate_steps_instruction(steps, None))
+                    instructions.append('Turn around.')
+                    instructions.append(generate_steps_instruction(steps, None))
+                else:
+                    steps = random.randint(1, 10)
+                    if steps == 1:
+                        instruction = f'Take 1 step.'
+                    else:
+                        instruction = f'Take {steps} steps.'
+                    instructions.append(instruction)
+                    turn = random.choice([True, False])
+                    if turn:
+                        instructions.append('Turn around.')
+                        turn_again = random.choice([True, False])
+                        if turn_again:
+                            instructions.append(instruction)
+                            direction = random.choice(['around', 'left', 'right'])
+                            instructions.append(f'Turn {direction}.')
+                        else:
+                            next_steps = random.randint(1, (steps - 1))
+                            final_steps = steps - next_steps
+                            if next_steps == 1:
+                                instructions.append(f'Take 1 step.')
+                            else:
+                                instructions.append(f'Take {next_steps} steps.')
+                            if final_steps == 1:
+                                instructions.append(f'Take 1 step.')
+                            else:
+                                instructions.append(f'Take {final_steps} steps.')
+                    else:
+                        if steps == 10:
+                            instruction = instructions.pop()
+                            # Replace 10 steps with randint(1,9) steps
+                            steps = random.randint(1, 9)
+                            instructions.append(generate_steps_instruction(steps, None))
+                        next_steps = random.randint(1, (10 - steps))
+                        total_steps = steps + next_steps
+                        instructions.append(generate_steps_instruction(next_steps, None))
+                        instructions.append('Turn around.')
+                        instructions.append(generate_steps_instruction(total_steps, None))
+
+        else:
+            for i in range(num):
+                instruction = generate_instruction(i, face_forward)
+                location.update(instruction)
+                if i == num - 1:
+                    if location.end_at_origin():
+                        end_at_origin = True
+                instructions.append(instruction)
     location.reset()
-    
+    if num in rest:
+        if end_at_origin:
+            import pickle
+            n_sentences_filtered = pickle.load(open('n_sentences_filtered.pkl', 'rb'))
+
+            import random
+            key = num
+            instruction = random.choices(list(n_sentences_filtered[key].keys()), weights=[v[0] for v in n_sentences_filtered[key].values()], k=1)[0]
+            number_options = n_sentences_filtered[key][instruction][1]
+            number_options = random.choice(number_options)
+            number_options = [int(x) for x in number_options.split('-')]
+            not_one = [x for x in number_options if x != 1]
+            m = min(not_one)
+            start = m - 2
+            m = max(not_one)
+            end = 10 - m
+            sub = random.randint(-start, end)
+            number_options = [x + sub for x in number_options if x != 1]
+            for n in number_options:
+                instruction = instruction.replace('n', str(n), 1)
+            instructions = instruction.split('.')
+        else:
+            for i in range(num):
+                instruction = generate_instruction(i, face_forward)
+                location.update(instruction)
+                if i == num - 1:
+                    if location.end_at_origin():
+                        end_at_origin = True
+                instructions.append(instruction)
+
     if add_cot:
         cot.append("Let's think step by step. \nWe start at the origin (0, 0), facing the positive y-axis.")
         for i in instructions:
@@ -203,7 +340,7 @@ def compute_accuracy(logits, labels):
     example_correct = torch.all(correct, dim=-1)
     return example_correct.float().mean()
 
-def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, use_cot=False):
+def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, use_cot=False, info=False):
 
     # Initialize wandb
     config = {
@@ -217,6 +354,9 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
     }
     wandb.init(project="nav", config=config)
     print(wandb.run.id)
+    if info:
+        # change run name to include num, num_steps, batch_size, architecture, learning_rate, weight_decay, use_cot
+        wandb.run.name = f'num{num}_steps{num_steps}_batch{batch_size}_arch{architecture.split("/")[-1]}_lr{learning_rate}_wd{weight_decay}'
     print(config)
 
     # Set up logging
@@ -330,13 +470,14 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train model on nav problem")
-    parser.add_argument("--num", type=int, default=3, help="Number of people in each problem")
-    parser.add_argument("--num_steps", type=int, default=5000, help="Number of training steps")
-    parser.add_argument("--batch_size", type=int, default=256, help="Batch size for training")
+    parser.add_argument("--num", type=int, default=4, help="Number of people in each problem")
+    parser.add_argument("--num_steps", type=int, default=500, help="Number of training steps")
+    parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training")
     parser.add_argument("--architecture", type=str, default="EleutherAI/pythia-160m", help="Model architecture to use")
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for optimizer")
     parser.add_argument("--weight_decay", type=float, default=0.1, help="Weight decay for optimizer")
     parser.add_argument("--use_cot", action="store_true", help="Use the 'Cot' statement in the problem")
+    parser.add_argument("--info", action="store_true", help="Use info in wandb name")
     args = parser.parse_args()
     
-    main(args.num, args.num_steps, args.batch_size, args.architecture, args.learning_rate, args.weight_decay, args.use_cot)
+    main(args.num, args.num_steps, args.batch_size, args.architecture, args.learning_rate, args.weight_decay, args.use_cot, args.info)

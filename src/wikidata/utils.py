@@ -154,7 +154,10 @@ def ent_to_relation_ids(ent_id: str):
     item = wikidata_item_given_id(ent_id)
     if item is None:
         return []
-    related_claims = item.get_truthy_claim_groups()
+    try:
+        related_claims = item.get_truthy_claim_groups()
+    except:
+        return []
     return list(related_claims.keys())
 
 

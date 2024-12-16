@@ -71,7 +71,7 @@ class TwoHopQuery(Query):
     def get_query_prompt(self):
         return self._phrase
 
-    def get_answers(self):
+    def get_answers(self, one_hop=False):
         answers = []
         for target in self._second_hop_target_ids:
             if type(target) is str:
@@ -79,10 +79,16 @@ class TwoHopQuery(Query):
             else:
                 target_answer = [str(target)]
             answers.append(self._filter_answers(target_answer))
-        return answers
+        if one_hop:
+            one_hop_answers = super().get_answers()
+            return answers, one_hop_answers
+        else:
+            return answers
 
     def to_dict(self):
         d = super().to_dict()
+        # Relabel one-hop answers from one-hop dict
+        d['one_hop_answers'] = d['answers']
         d['query_type'] = 'two_hop'
         d['second_relation'] = self._second_relation.name
         d['second_hop_target_ids'] = self._second_hop_target_ids

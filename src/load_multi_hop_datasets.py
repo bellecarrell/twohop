@@ -22,10 +22,12 @@ for fname in glob.glob('/n/holyscratch01/kempner_lab/Everyone/data/twohop/top_en
 facts_str = list(two_hop.keys()) 
 print(f'{len(facts_str)} two hop facts')
 write_json(two_hop,'/n/holyscratch01/kempner_lab/Everyone/data/multihop/two_hop_dataset.json')
-
-facts_str = facts_str[:41000]
-train_facts = facts_str[:32800]
-test_facts = facts_str[32800:]
+random.shuffle(facts_str)
+n_facts = 41000
+train_n = int(n_facts *0.8)
+facts_str = facts_str[:n_facts]
+train_facts = facts_str[:train_n]
+test_facts = facts_str[train_n:]
 
 train = {}
 test = {}
@@ -52,5 +54,27 @@ for fname in glob.glob('/n/holyscratch01/kempner_lab/Everyone/data/twohop/top_en
     #     partial[uuid] = Query.from_dict(dicts[uuid])
     # one_hop.update(partial)
 
-print(f'{len(one_hop.keys())} one hop facts')
+facts_str = list(one_hop.keys()) 
 write_json(one_hop,'/n/holyscratch01/kempner_lab/Everyone/data/multihop/one_hop_dataset.json')
+random.shuffle(facts_str)
+print(f'{len(facts_str)} one hop facts')
+
+n_facts = 32000
+train_n = int(n_facts *0.8)
+facts_str = facts_str[:n_facts]
+train_facts = facts_str[:train_n]
+test_facts = facts_str[train_n:]
+
+train = {}
+test = {}
+for f in train_facts:
+    train[f] = one_hop[f]
+
+for f in test_facts:
+    test[f] = one_hop[f]
+
+print(f'{len(train_facts)} train facts')
+print(f'{len(test_facts)} test facts')
+
+write_json(train,'/n/holyscratch01/kempner_lab/Everyone/data/multihop/train_one_hop_dataset.json')
+write_json(test,'/n/holyscratch01/kempner_lab/Everyone/data/multihop/test_one_hop_dataset.json')

@@ -86,8 +86,8 @@ def two_hop_axis(subject_id: str, relation: Relation, target_id: str, facts: dic
 
 def build_two_hop_dataset(args):
     random.seed(args.seed)
-    DATA_DIR = '/n/holyscratch01/kempner_lab/Everyone/data/twohop'
-    SUBDIR = os.path.join(DATA_DIR, f'{args.facts_file}_{args.num_facts}_facts')
+    DATA_DIR = os.path.join('/n/netscratch/kempner_sham_lab/Lab/acarrell/twohop/',args.ent_dir)
+    
     fname = os.path.join(DATA_DIR, args.facts_file+'.json')
     facts = load_json(fname)
     facts_str = list(facts.keys())
@@ -111,7 +111,8 @@ def build_two_hop_dataset(args):
             continue
         break
 
-    two_hop_fname = f'two_hop_fom_{args.facts_file}_{args.num_facts}_facts_{args.seed}.json'
+    SUBDIR = os.path.join(DATA_DIR, f'processed')
+    two_hop_fname = f'two_hop_fom_{args.facts_file}_.json'
     two_hop_fname_full = os.path.join(SUBDIR, two_hop_fname)
     one_hop_fname = f'one_hop_from_{two_hop_fname}'
     one_hop_fname = os.path.join(SUBDIR, one_hop_fname)
@@ -120,7 +121,8 @@ def build_two_hop_dataset(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num_facts", type=int, default=50)
+    parser.add_argument("--num_facts", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=12345)
-    parser.add_argument("--facts_file", type=str, default='top_ents_5000_entities_0_facts_each')
+    parser.add_argument("--ent_dir", type=str, default='ent_10k_dataset_small')
+    parser.add_argument("--facts_file", type=str, default='')
     build_two_hop_dataset(parser.parse_args())
