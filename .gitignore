@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.sh
+*.pkl
 
 # C extensions
 *.so
@@ -165,3 +167,8 @@ data/
 # Job output
 *.out
 *.err
+
+# Wandb
+src/wandb/
+
+*.json
