@@ -11,7 +11,7 @@ import wandb
 import names
 import random
 
-from build_two_hop_training_splits import read_jsonl_file
+
 class Location:
     def __init__(self, x=0, y=0, heading=0):
         self.x = x
@@ -86,12 +86,30 @@ class Location:
         self.y = 0
         self.heading = 0
 
-def generate_direction(face_forward=True):
+# +
+def generate_reverse_direction(direction):
+    if direction == 'forward':
+        return 'backward'
+    elif direction == 'backward':
+        return 'forward'
+    elif direction == 'left':
+        return 'right'
+    elif direction == 'right':
+        return 'left'
+    else:
+        return None
+
+def generate_direction(face_forward=True, used_direction=None):
+    ff_directions = ['forward', 'backward', 'left', 'right']
+    if used_direction is not None:
+        ff_directions.remove(used_direction)
+        ff_directions.remove(generate_reverse_direction(used_direction))
     if face_forward:
-        return random.choice(['forward', 'backward', 'left', 'right'])
+        return random.choice(ff_directions)
     else:
         return random.choice(['around', 'left', 'right'])
 
+# +
 def generate_complementary_direction(direction):
     if direction == 'forward' or direction == 'backward':
         return random.choice(['forward', 'backward'])
@@ -99,6 +117,9 @@ def generate_complementary_direction(direction):
         return random.choice(['left', 'right'])
     else:
         return None
+    
+
+# -
 
 def generate_steps_instruction(steps, direction):
     if direction:
@@ -137,8 +158,175 @@ def generate_instruction(i=0, face_forward=True):
     return instruction
 
 
+def generate_numbers(n, target_sum):
+    """Generates n numbers that sum to target_sum."""
+
+    numbers = []
+    remaining_sum = target_sum
+
+    for i in range(n - 1):
+        # Generate a random number less than the remaining sum
+        num = random.randint(1, remaining_sum - (n - i - 1)) 
+        numbers.append(num)
+        remaining_sum -= num
+
+    # Add the last number to ensure the sum is correct
+    numbers.append(remaining_sum)
+
+    return numbers
+
+
+def generate_ff_instructions(num, used_direction=None):
+    instructions = []
+    min_steps = max([2, num])
+    steps = random.randint(min_steps, 10)
+    direction = generate_direction(True, used_direction)
+    back = generate_reverse_direction(direction)
+    instructions_direction = random.randint(1, num-1)
+    instructions_back = num - instructions_direction
+
+    for dir, num_instructions in [(direction, instructions_direction), (back, instructions_back)]:
+        if num_instructions == 1:
+            steps_dir = [steps]
+        else:
+            print(f'num_instructions: {num_instructions}')
+            print(f'steps: {steps}')
+            steps_dir = generate_numbers(num_instructions, steps)
+    
+        for i in range(num_instructions):
+            instruction = generate_steps_instruction(steps_dir[i], dir)
+            instructions.append(instruction)
+    print(f'instructions before shuffle: {instructions}')
+    random.shuffle(instructions)
+    print(f'instructions after shuffle: {instructions}')
+    return instructions
+
+
+# +
+MIN_DIRS_FF = 2
+MIN_DIRS_NO_FF = 3
+
+def turn(direction):
+    return f'Turn {direction}.'
+
+def generate_turn(num, rotation):
+    if rotation not in [0, 90, 180] or num not in [1, 2]:
+        raise ValueError("Invalid rotation or number of instructions.")
+    if rotation == 0:
+        dirs = ['left', 'right', 'around']
+        if num == 1:
+            return [turn(random.choice(dirs))]
+        elif num == 2:
+            return [turn(random.choice(dirs)), turn(random.choice(dirs))]
+    if rotation == 90:
+        directions = ['left', 'right']
+        if num == 1:
+            return [turn(random.choice(directions))]
+        elif num == 2:
+            return [turn('around'), random.choice(directions)]
+    elif rotation == 180:
+        if num == 1:
+            return [turn('around')]
+        elif num == 2:
+            dir = random.choice(['left', 'right'])
+            return [turn(dir), turn(dir)]
+
+def step(step):
+    if step == 1:
+        return 'Take 1 step.'
+    else:
+        return f'Take {step} steps.'
+
+def generate_step(num, steps):
+    if num == 1:
+        return [step(steps)]
+    else:
+        nums = generate_numbers(num, steps)
+        return [step(num) for num in nums]
+    
+def max_steps(steps_turns):
+    max_steps = 0
+    for i in range(len(steps_turns)-1):
+        if i % 2 != 0:
+            if steps_turns[i] > max_steps:
+                max_steps = steps_turns[i]
+    return max_steps
+
+def generate_turn_directions(num):
+    if num < 3:
+        raise ValueError("Number of instructions must be at least 3.")
+    steps_turns = [1] * 3
+    steps_turns.insert(0,0)
+    steps_turns.append(0)
+    to_add = num - 3
+    for i in range(to_add):
+        idx = random.randint(0, len(steps_turns)-1)
+        # Ensure there are not more than 2 instructions for 180 turn 
+        while idx == 2 and steps_turns[idx] == 2:
+            idx = random.randint(0, len(steps_turns)-1)
+        steps_turns[idx] += 1
+    instructions = []
+    min_steps = max_steps(steps_turns)
+    steps = random.randint(min_steps, 10) 
+    for i, num_instructions in enumerate(steps_turns):
+        if i % 2 == 0:
+            if i in [0, 4]:
+                rotation = 0
+                if num_instructions != 0:
+                    instructions.extend(generate_turn(num_instructions, rotation))
+            elif i in [2]:
+                rotation = 180
+                instructions.extend(generate_turn(num_instructions, rotation))
+        else:
+            instructions.extend(generate_step(num_instructions, steps))
+    return instructions
+
+def generate_two_turn_six_steps(num):
+    if num == 6:
+        instructions = generate_turn_directions(3)
+        instructions.extend(generate_turn_directions(3))
+    else:
+        instructions_turn_one = random.randint(MIN_DIRS_NO_FF, num - MIN_DIRS_FF)
+        instructions_turn_two = num - instructions_turn_one
+        instructions = generate_turn_directions(instructions_turn_one)
+        instructions.extend(generate_turn_directions(instructions_turn_two))
+    return instructions
+
+def generate_two_turn_directions(num):
+    if num < 6:
+        raise ValueError("Number of instructions must be at least 6.")
+    if num == 6:
+        return generate_two_turn_six_steps(num)
+    else:
+        six_steps_path = random.choice([True, False])
+        if six_steps_path:
+            return generate_two_turn_six_steps(num)
+        else:
+            m = random.randint(1, 10)
+            n = random.randint(1, 10)
+            lr = random.choice(['left', 'right'])
+            instructions = []
+            instructions.append(step(m))
+            instructions.append(turn(lr))
+            instructions.append(step(n))
+            instructions.append(turn(lr))
+            instructions.append(step(m))
+            instructions.append(turn(lr))
+            instructions.append(step(n))
+            return instructions
+    
+
+
+# +
+import random
+def get_direction(instructions):
+    for i in instructions:
+        if 'steps' in i:
+            return i.split(' ')[-1].strip('.')
+    return None
 
 def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=False):
+    import random
     if num not in list(range(3, 11)):
         raise ValueError("Only 3-10 sentence problems are supported at this time.")
     prefix = 'Q: If you follow these instructions, do you return to the starting point?'
@@ -181,7 +369,7 @@ def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=Fals
                     if location.end_at_origin():
                         end_at_origin = True
                 instructions.append(instruction)
-    rest = list(range(5, 11))            
+    rest = list(range(8, 11))            
     if num == 4:
         if end_at_origin:
             if face_forward:
@@ -260,7 +448,100 @@ def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=Fals
                     if location.end_at_origin():
                         end_at_origin = True
                 instructions.append(instruction)
-    location.reset()
+    if num == 5:
+        if end_at_origin:
+            if face_forward:
+                n = num - 1
+                one_direction = random.choice([True, False])
+                if one_direction:
+                    instructions = generate_ff_instructions(n)
+                # Two directions
+                else:
+                    n1 = random.randint(MIN_DIRS_FF, n-2)
+                    n2 = n - n1
+                    instructions = generate_ff_instructions(n1)
+                    used_direction = get_direction(instructions)
+                    instructions.extend(generate_ff_instructions(n2, used_direction))
+                instructions.insert(0, ff)
+            else:
+                instructions = generate_turn_directions(num)
+        else:
+            for i in range(num):
+                instruction = generate_instruction(i, face_forward)
+                location.update(instruction)
+                if i == num - 1:
+                    if location.end_at_origin():
+                        end_at_origin = True
+                instructions.append(instruction)
+    if num == 6:
+        if end_at_origin:
+            one_direction = random.choice([True, False])
+            n = num - 1
+            if face_forward:
+                
+                if one_direction:
+                    instructions = generate_ff_instructions(n)
+                # Two directions
+                else:
+                    n1 = random.randint(MIN_DIRS_FF, n-2)
+                    n2 = n - n1
+                    instructions = generate_ff_instructions(n1)
+                    used_direction = get_direction(instructions)
+                    instructions.extend(generate_ff_instructions(n2, used_direction))
+                instructions.insert(0, ff)
+            else:
+                if one_direction:
+                    instructions = generate_turn_directions(n)
+                # Two directions
+                else:
+                    instructions = generate_two_turn_directions(num)
+        else:
+            for i in range(num):
+                instruction = generate_instruction(i, face_forward)
+                location.update(instruction)
+                if i == num - 1:
+                    if location.end_at_origin():
+                        end_at_origin = True
+                instructions.append(instruction)
+    if num == 7:
+        if end_at_origin:
+            n = num - 1
+            if face_forward:
+                
+                num_directions = random.randint(1, 2)
+                if num_directions == 1:
+                    instructions = generate_ff_instructions(n)
+                # Two directions
+                elif num_directions == 2:
+                    n1 = random.randint(MIN_DIRS_FF, n-2)
+                    n2 = n - n1
+                    instructions = generate_ff_instructions(n1)
+                    used_direction = get_direction(instructions)
+                    instructions.extend(generate_ff_instructions(n2, used_direction))
+                # Three directions
+                # else:
+                #     n1 = random.randint(MIN_DIRS_FF, n-(2*MIN_DIRS_FF))
+                #     n2 = random.randint(MIN_DIRS_FF, n-MIN_DIRS_FF-n1)
+                #     n3 = n - n1 - n2
+                #     instructions = generate_ff_instructions(n1)
+                #     instructions.extend(generate_ff_instructions(n2))
+                #     instructions.extend(generate_ff_instructions(n3))
+                instructions.insert(0, ff)
+            else:
+                one_direction = random.choice([True, False])
+                if one_direction:
+                    instructions = generate_turn_directions(n)
+                # Two directions
+                else:
+                    instructions = generate_two_turn_directions(num)
+        else:
+            for i in range(num):
+                instruction = generate_instruction(i, face_forward)
+                location.update(instruction)
+                if i == num - 1:
+                    if location.end_at_origin():
+                        end_at_origin = True
+                instructions.append(instruction)
     if num in rest:
         if end_at_origin:
             import pickle
@@ -290,7 +571,7 @@ def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=Fals
                     if location.end_at_origin():
                         end_at_origin = True
                 instructions.append(instruction)
-
+    location.reset()
     if add_cot:
         cot.append("Let's think step by step. \nWe start at the origin (0, 0), facing the positive y-axis.")
         for i in instructions:
@@ -311,7 +592,10 @@ def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=Fals
         return (prefix + problem, cot + 'Answer: ' + answer)
     else:
         return (prefix + problem, 'Answer: ' + answer)            
-                
+
+
+# -
+
 def get_batch(batch_size=16, num=5, add_cot=False):
     problems = []
     answers = []
