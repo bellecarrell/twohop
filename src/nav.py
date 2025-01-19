@@ -189,16 +189,12 @@ def generate_ff_instructions(num, used_direction=None):
         if num_instructions == 1:
             steps_dir = [steps]
         else:
-            print(f'num_instructions: {num_instructions}')
-            print(f'steps: {steps}')
             steps_dir = generate_numbers(num_instructions, steps)
     
         for i in range(num_instructions):
             instruction = generate_steps_instruction(steps_dir[i], dir)
             instructions.append(instruction)
-    print(f'instructions before shuffle: {instructions}')
     random.shuffle(instructions)
-    print(f'instructions after shuffle: {instructions}')
     return instructions
 
 
@@ -640,7 +636,7 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
     print(wandb.run.id)
     if info:
         # change run name to include num, num_steps, batch_size, architecture, learning_rate, weight_decay, use_cot
-        wandb.run.name = f'num{num}_steps{num_steps}_batch{batch_size}_arch{architecture.split("/")[-1]}_lr{learning_rate}_wd{weight_decay}'
+        wandb.run.name = f'{info}_num{num}_steps{num_steps}_batch{batch_size}_arch{architecture.split("/")[-1]}_lr{learning_rate}_wd{weight_decay}'
     print(config)
 
     # Set up logging
@@ -761,7 +757,7 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate for optimizer")
     parser.add_argument("--weight_decay", type=float, default=0.1, help="Weight decay for optimizer")
     parser.add_argument("--use_cot", action="store_true", help="Use the 'Cot' statement in the problem")
-    parser.add_argument("--info", action="store_true", help="Use info in wandb name")
+    parser.add_argument("--info", type=str, help="Use info in wandb name")
     args = parser.parse_args()
     
     main(args.num, args.num_steps, args.batch_size, args.architecture, args.learning_rate, args.weight_decay, args.use_cot, args.info)
