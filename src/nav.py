@@ -12,16 +12,60 @@ import names
 import random
 
 
+# +
+def turn(direction):
+    return f'Turn {direction}.'
+
+def generate_turn(num, rotation):
+    if rotation not in [0, 90, 180] or num not in [1, 2]:
+        raise ValueError("Invalid rotation or number of instructions.")
+    if rotation == 0:
+        dirs = ['left', 'right', 'around']
+        if num == 1:
+            return [turn(random.choice(dirs))]
+        elif num == 2:
+            return [turn(random.choice(dirs)), turn(random.choice(dirs))]
+    if rotation == 90:
+        directions = ['left', 'right']
+        if num == 1:
+            return [turn(random.choice(directions))]
+        elif num == 2:
+            return [turn('around'), random.choice(directions)]
+    elif rotation == 180:
+        if num == 1:
+            return [turn('around')]
+        elif num == 2:
+            dir = random.choice(['left', 'right'])
+            return [turn(dir), turn(dir)]
+
+def step(step, direction=None):
+    step = abs(step)
+    if direction is None:
+        if step == 1:
+            return 'Take 1 step.'
+        return f'Take {step} steps.'
+    else:
+        if step == 1:
+            return f'Take 1 step {direction}.' 
+        return f'Take {step} steps {direction}.' 
+
 class Location:
-    def __init__(self, x=0, y=0, heading=0):
+    def __init__(self, x=0, y=0, heading=0, face_forward=False):
         self.x = x
         self.y = y
         self.heading = heading
+        self.face_forward = face_forward
     
-    def update(self, instruction):
+    def update(self, instruction, verbose=False):
+
         instruction = instruction.strip()
         instruction = instruction.strip('.')
+        if verbose:
+            print(f'Instruction: {instruction}')
+        
         if instruction.startswith('Take'):
+            if verbose:
+                print(f'xy before step: {self.x} {self.y}')
             steps = int(instruction.split(' ')[1])
             if instruction.endswith('forward'):
                 self.y += steps
@@ -40,7 +84,12 @@ class Location:
                     self.y -= steps
                 elif self.heading == 270:
                     self.x -= steps
+            if verbose:
+                print(f'xy after step: {self.x} {self.y}')
         elif instruction.startswith('Turn'):
+            if verbose:
+                print(f'Heading before turn: {self.heading}')
+
             if instruction.endswith('left'):
                 self.heading -= 90
             elif instruction.endswith('right'):
@@ -48,20 +97,147 @@ class Location:
             elif instruction.endswith('around'):
                 self.heading += 180
             self.heading = self.heading % 360
+            if verbose:
+                print(f'Heading after turn: {self.heading}')
         else:
             pass
+        
 
-    def go_to_origin(self, num_instructions=1, instructions=None):
-        if num_instructions != 1:
-            raise ValueError("Only 1 instruction is supported at this time.")
+    def return_direction(self, axis='x'):
+        if axis not in ['x', 'y']:
+            raise ValueError("Invalid axis.")
+        if axis == 'x':
+            if self.x > 0:
+                return 270
+            else:
+                return 90
+        if axis == 'y':
+            if self.y > 0:
+                return 180
+            else:
+                return 0
+            
+    def turn_to(self, direction):
+        if direction not in [0, 90, 180, 270]:
+            raise ValueError('Invalid direction.')
+        
+        turn = {90: 'right', -270: 'right', -90: 'left', 270: 'left', 180: 'around', -180: 'around'}
+
+        heading = self.heading if self.heading != 0 else 0
+        turn_direction = direction - heading
+        return turn[turn_direction]
+            
+    def no_turn(self, direction):
+        if self.heading == direction:
+            return True
+        return False
+
+    def go_to_origin(self, num_instructions=None, instructions=None):
+        if not num_instructions:
+            num_instructions = self.instr_to_origin()
+        instructions = []
+        if self.face_forward:
+            if self.x > 0:
+                instructions.append(step(self.x, 'left'))
+            elif self.x < 0:
+                instructions.append(step(self.x, 'right'))
+            if self.y > 0:
+                instructions.append(step(self.y, 'backward'))
+            elif self.y < 0:
+                instructions.append(step(self.y, 'forward'))
+            if num_instructions > 1:
+                random.shuffle(instructions)
+            
+            if num_instructions == 1:
+                return instructions[0]
+            return instructions
+        else:
+            return_x = self.return_direction('x')
+            return_y = self.return_direction('y')
+            ins_x = []
+            ins_y = []
+            if self.x != 0 and self.y != 0:
+                x_first = random.choice([True, False])
+                if x_first:
+                    if not self.no_turn(return_x):
+                        ins_x.append(turn(self.turn_to(return_x)))
+                    ins_x.append(step(self.x))
+                    for i in ins_x:
+                        instructions.append(i)
+                        self.update(i)
+                    if not self.no_turn(return_y):
+                        ins_y.append(turn(self.turn_to(return_y)))
+                    ins_y.append(step(self.y))
+                    for i in ins_y:
+                        instructions.append(i)
+                        self.update(i)
+                else:
+                    if not self.no_turn(return_y):
+                        ins_y.append(turn(self.turn_to(return_y)))
+                        ins_y.append(step(self.y))
+                        for i in ins_y:
+                            instructions.append(i)
+                            self.update(i)
+                    if not self.no_turn(return_x):
+                        ins_x.append(turn(self.turn_to(return_x)))
+                        ins_x.append(step(self.x))
+                        for i in ins_x:
+                            instructions.append(i)
+                            self.update(i)
+            elif self.x != 0:
+                if not self.no_turn(return_x):
+                    ins_x.append(turn(self.turn_to(return_x)))
+                ins_x.append(step(self.x))
+                for i in ins_x:
+                    instructions.append(i)
+                    self.update(i)
+            elif self.y != 0:
+                if not self.no_turn(return_y):
+                    ins_y.append(turn(self.turn_to(return_y)))
+                ins_y.append(step(self.y))
+                for i in ins_y:
+                    instructions.append(i)
+                    self.update(i)
+            if num_instructions == 1:
+                instructions = ''.join(instructions)
+            # if not self.end_at_origin():
+            #     return ValueError("Did not end at origin.")
+            else:
+                self.reset()
+            
+            return instructions
+        
+    def nonzero(self):
+        nonzero = 0
+        if self.x != 0:
+            nonzero += 1
+        if self.y != 0:
+            nonzero += 1
+        return nonzero
+    
+    def turns_to_origin(self):
+        if self.face_forward:
+            return ValueError("Cannot calculate turns to origin when facing forward.")
+        turns = 0
         if self.x > 0:
-            return f'Take {self.x} steps left.'
+            if self.heading != 270:
+                turns += 1
         elif self.x < 0:
-            return f'Take {abs(self.x)} steps right.'
-        elif self.y > 0:
-            return f'Take {self.y} steps backward.'
+            if self.heading != 90:
+                turns += 1
+        if self.y > 0:
+            if self.heading != 180:
+                turns += 1
         elif self.y < 0:
-            return f'Take {abs(self.y)} steps forward.'
+            if self.heading != 0:
+                turns += 1
+        return turns
+
+    def instr_to_origin(self):
+        if self.face_forward:
+            return self.nonzero()
+        else:
+            return self.nonzero() + self.turns_to_origin()
             
     def print_heading(self):
         if self.heading == 0:
@@ -78,13 +254,19 @@ class Location:
     def end_at_origin(self):
         return self.x == 0 and self.y == 0
 
+    # def __str__(self):
+    #     return f'({self.x}, {self.y}), {self.print_heading()}.'
+
     def __str__(self):
-        return f'({self.x}, {self.y}), {self.print_heading()}.'
+        return f'({self.x}, {self.y}, {self.heading}).'
     
     def reset(self):
         self.x = 0
         self.y = 0
         self.heading = 0
+
+    def valid(self):
+        return self.x <= 10 and self.x >= -10 and self.y <= 10 and self.y >= -10
 
 # +
 def generate_reverse_direction(direction):
@@ -109,7 +291,9 @@ def generate_direction(face_forward=True, used_direction=None):
     else:
         return random.choice(['around', 'left', 'right'])
 
-# +
+
+# -
+
 def generate_complementary_direction(direction):
     if direction == 'forward' or direction == 'backward':
         return random.choice(['forward', 'backward'])
@@ -117,9 +301,7 @@ def generate_complementary_direction(direction):
         return random.choice(['left', 'right'])
     else:
         return None
-    
 
-# -
 
 def generate_steps_instruction(steps, direction):
     if direction:
@@ -134,7 +316,28 @@ def generate_steps_instruction(steps, direction):
             instruction = f'Take {steps} steps.'
     return instruction
 
-def generate_instruction(i=0, face_forward=True):
+# +
+def validate_instruction(instruction, location, same_distance=False, verbose=False):
+    if not instruction:
+        return False
+    num_instructions = location.instr_to_origin()
+    location_copy = Location(location.x, location.y, location.heading, face_forward=location.face_forward)
+    location_copy.update(instruction)
+    if verbose:
+        print(f'------- validating instruction: {instruction} -------')
+        print(f'location: {location}')
+        print(f'location_copy: {location_copy}')
+        print(f'num_instructions to origin: {num_instructions}')
+        print(f'num instructions copy: {location_copy.instr_to_origin()}')
+
+    if same_distance:
+        if location_copy.instr_to_origin() > num_instructions:
+            if verbose:
+                print('not same distance or less')
+            return False
+    return location_copy.valid()
+
+def generate_instruction(i=0, face_forward=True, end_at_origin=False):
     if face_forward:
         if i == 0:
             instruction = 'Always face forward.'
@@ -146,7 +349,8 @@ def generate_instruction(i=0, face_forward=True):
             else:
                 instruction = f'Take {steps} steps {direction}.'
     else:
-        turn = random.choice([True, False])
+        from numpy.random import choice
+        turn = choice([True, False],p=[0.3,0.7])
         if turn:
             instruction = random.choice(['Turn left.', 'Turn right.', 'Turn around.'])
         else:
@@ -157,6 +361,8 @@ def generate_instruction(i=0, face_forward=True):
                 instruction = f'Take {steps} steps.'
     return instruction
 
+
+# -
 
 def generate_numbers(n, target_sum):
     """Generates n numbers that sum to target_sum."""
@@ -202,36 +408,6 @@ def generate_ff_instructions(num, used_direction=None):
 MIN_DIRS_FF = 2
 MIN_DIRS_NO_FF = 3
 
-def turn(direction):
-    return f'Turn {direction}.'
-
-def generate_turn(num, rotation):
-    if rotation not in [0, 90, 180] or num not in [1, 2]:
-        raise ValueError("Invalid rotation or number of instructions.")
-    if rotation == 0:
-        dirs = ['left', 'right', 'around']
-        if num == 1:
-            return [turn(random.choice(dirs))]
-        elif num == 2:
-            return [turn(random.choice(dirs)), turn(random.choice(dirs))]
-    if rotation == 90:
-        directions = ['left', 'right']
-        if num == 1:
-            return [turn(random.choice(directions))]
-        elif num == 2:
-            return [turn('around'), random.choice(directions)]
-    elif rotation == 180:
-        if num == 1:
-            return [turn('around')]
-        elif num == 2:
-            dir = random.choice(['left', 'right'])
-            return [turn(dir), turn(dir)]
-
-def step(step):
-    if step == 1:
-        return 'Take 1 step.'
-    else:
-        return f'Take {step} steps.'
 
 def generate_step(num, steps):
     if num == 1:
@@ -314,283 +490,96 @@ def generate_two_turn_directions(num):
 
 
 # +
-import random
-def get_direction(instructions):
-    for i in instructions:
-        if 'steps' in i:
-            return i.split(' ')[-1].strip('.')
-    return None
+import copy
+def generate_instruction_same_dist_to_origin(i, location):
+    instruction = generate_instruction(i, False)
+    location_copy = Location(x=location.x, y=location.y, heading=location.heading, face_forward=False)
+    num_instr_to_origin = location.instr_to_origin()
+    while not validate_instruction(instruction, location_copy, same_distance=True):
+        instruction = generate_instruction(i, False)
+
+    return instruction
 
 def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=False):
     import random
-    if num not in list(range(3, 11)):
-        raise ValueError("Only 3-10 sentence problems are supported at this time.")
-    prefix = 'Q: If you follow these instructions, do you return to the starting point?'
+
+    prefix = 'Question: If you follow these instructions, do you return to the starting point?\n'
     ff = 'Always face forward.'
-    location = Location()
+    location = Location(face_forward=face_forward)
     instructions = []
     cot = []
-    if num == 3:
-        if end_at_origin:
-            if face_forward:
-                instructions.append(ff)
-                
-                steps = random.randint(1, 10)
-                direction = random.choice(['forward', 'backward', 'left', 'right'])
-                if steps == 1:
-                    instruction = f'Take 1 step {direction}.'
-                else:
-                    instruction = f'Take {steps} steps {direction}.'
-                instructions.append(instruction)
+    remaining = num
+    i = 0
 
-                location.update(instruction)
-                instructions.append(location.go_to_origin())
-            else:
-                steps = random.randint(1, 10)
-                if steps == 1:
-                    instruction = f'Take 1 step.'
-                else:
-                    instruction = f'Take {steps} steps.'
-                instructions.append(instruction)
-                instructions.append('Turn around.')
-                instructions.append(instruction)
+    while remaining > 0:
+        instr_added = 1
+
+        instruction = generate_instruction(i, face_forward)
+        while not validate_instruction(instruction, location):
+            instruction = generate_instruction(i, face_forward)
         
+        remaining -= instr_added
+        i += instr_added
+        
+        if type(instruction) == str:
+            location.update(instruction)
+        
+        if type(instruction) == list:
+            instructions.extend(instruction)
+            location.reset()
+            for j in instructions:
+                location.update(j)
         else:
-            for i in range(num):
-                instruction = generate_instruction(i, face_forward)
+            instructions.append(instruction)
+    
+    FF_TO_ORIGIN = 2
+    NO_FF_TO_ORIGIN = 4
+    instr_to_origin = {True: FF_TO_ORIGIN, False: NO_FF_TO_ORIGIN}
 
-                
-                location.update(instruction)
-                if i == num - 1:
-                    if location.end_at_origin():
-                        end_at_origin = True
-                instructions.append(instruction)
-    rest = list(range(8, 11))            
-    if num == 4:
-        if end_at_origin:
-            if face_forward:
-                instructions.append(ff)
-                
-                steps = random.randint(1, 10)
-                direction = generate_direction(face_forward)
-                second_direction = generate_complementary_direction(direction)
-                if direction == second_direction:
-                    # To prevent going too far from origin
-                    steps = random.randint(1, 9)
-                    second_steps = random.randint(1, (10 - steps))
-                else:
-                    # To prevent going to origin too early
-                    second_steps = random.choice(list(set([x for x in list(range(1, 11))]) - set([steps])))
+    if end_at_origin:
+        if not location.end_at_origin():
+            # Get min of instr_to_origin or len of instructions
+            to_remove = min(instr_to_origin[face_forward], len(instructions))
+            instructions = instructions[:-to_remove]
 
-                instruction = generate_steps_instruction(steps, direction)
-                instructions.append(instruction)
-                location.update(instruction)
-                instruction = generate_steps_instruction(second_steps, second_direction)
-                instructions.append(instruction)
-                location.update(instruction)
-                instructions.append(location.go_to_origin())
-            else:
-                first_direction_turn = random.choice([True, False])
-                if first_direction_turn:
-                    direction = generate_direction(face_forward)
-                    instructions.append(f'Turn {direction}.')
-                    steps = random.randint(1, 10)
-                    instructions.append(generate_steps_instruction(steps, None))
-                    instructions.append('Turn around.')
-                    instructions.append(generate_steps_instruction(steps, None))
-                else:
-                    steps = random.randint(1, 10)
-                    if steps == 1:
-                        instruction = f'Take 1 step.'
-                    else:
-                        instruction = f'Take {steps} steps.'
-                    instructions.append(instruction)
-                    turn = random.choice([True, False])
-                    if turn:
-                        instructions.append('Turn around.')
-                        turn_again = random.choice([True, False])
-                        if turn_again:
-                            instructions.append(instruction)
-                            direction = random.choice(['around', 'left', 'right'])
-                            instructions.append(f'Turn {direction}.')
-                        else:
-                            next_steps = random.randint(1, (steps - 1))
-                            final_steps = steps - next_steps
-                            if next_steps == 1:
-                                instructions.append(f'Take 1 step.')
-                            else:
-                                instructions.append(f'Take {next_steps} steps.')
-                            if final_steps == 1:
-                                instructions.append(f'Take 1 step.')
-                            else:
-                                instructions.append(f'Take {final_steps} steps.')
-                    else:
-                        if steps == 10:
-                            instruction = instructions.pop()
-                            # Replace 10 steps with randint(1,9) steps
-                            steps = random.randint(1, 9)
-                            instructions.append(generate_steps_instruction(steps, None))
-                        next_steps = random.randint(1, (10 - steps))
-                        total_steps = steps + next_steps
-                        instructions.append(generate_steps_instruction(next_steps, None))
-                        instructions.append('Turn around.')
-                        instructions.append(generate_steps_instruction(total_steps, None))
+            location.reset()
+            for i in instructions:
+                location.update(i)
+            
+            if not location.end_at_origin():
+                new_instruction = location.go_to_origin()
+                if type(new_instruction) == str:
+                    new_instruction = [new_instruction]
+                instructions.extend(new_instruction)
 
-        else:
-            for i in range(num):
-                instruction = generate_instruction(i, face_forward)
-                location.update(instruction)
-                if i == num - 1:
-                    if location.end_at_origin():
-                        end_at_origin = True
-                instructions.append(instruction)
-    if num == 5:
-        if end_at_origin:
-            if face_forward:
-                n = num - 1
-                one_direction = random.choice([True, False])
-                if one_direction:
-                    instructions = generate_ff_instructions(n)
-                # Two directions
-                else:
-                    n1 = random.randint(MIN_DIRS_FF, n-2)
-                    n2 = n - n1
-                    instructions = generate_ff_instructions(n1)
-                    used_direction = get_direction(instructions)
-                    instructions.extend(generate_ff_instructions(n2, used_direction))
-                instructions.insert(0, ff)
+                if len(new_instruction) != to_remove:
+                    remaining = to_remove - len(new_instruction)
+                    dirs = ['left', 'right', 'around']
+                    new_instruction = [turn(random.choice(dirs)) for i in range(remaining)]
+                    instructions.extend(new_instruction)
             else:
-                instructions = generate_turn_directions(num)
-        else:
-            for i in range(num):
-                instruction = generate_instruction(i, face_forward)
-                location.update(instruction)
-                if i == num - 1:
-                    if location.end_at_origin():
-                        end_at_origin = True
-                instructions.append(instruction)
-    if num == 6:
-        if end_at_origin:
-            one_direction = random.choice([True, False])
-            n = num - 1
-            if face_forward:
-                
-                if one_direction:
-                    instructions = generate_ff_instructions(n)
-                # Two directions
-                else:
-                    n1 = random.randint(MIN_DIRS_FF, n-2)
-                    n2 = n - n1
-                    instructions = generate_ff_instructions(n1)
-                    used_direction = get_direction(instructions)
-                    instructions.extend(generate_ff_instructions(n2, used_direction))
-                instructions.insert(0, ff)
-            else:
-                if one_direction:
-                    instructions = generate_turn_directions(n)
-                # Two directions
-                else:
-                    instructions = generate_two_turn_directions(num)
-        else:
-            for i in range(num):
-                instruction = generate_instruction(i, face_forward)
-                location.update(instruction)
-                if i == num - 1:
-                    if location.end_at_origin():
-                        end_at_origin = True
-                instructions.append(instruction)
-    if num == 7:
-        if end_at_origin:
-            n = num - 1
-            if face_forward:
-                
-                num_directions = random.randint(1, 2)
-                if num_directions == 1:
-                    instructions = generate_ff_instructions(n)
-                # Two directions
-                elif num_directions == 2:
-                    n1 = random.randint(MIN_DIRS_FF, n-2)
-                    n2 = n - n1
-                    instructions = generate_ff_instructions(n1)
-                    used_direction = get_direction(instructions)
-                    instructions.extend(generate_ff_instructions(n2, used_direction))
-                # Three directions
-                # else:
-                #     n1 = random.randint(MIN_DIRS_FF, n-(2*MIN_DIRS_FF))
-                #     n2 = random.randint(MIN_DIRS_FF, n-MIN_DIRS_FF-n1)
-                #     n3 = n - n1 - n2
-                #     instructions = generate_ff_instructions(n1)
-                #     instructions.extend(generate_ff_instructions(n2))
-                #     instructions.extend(generate_ff_instructions(n3))
-                instructions.insert(0, ff)
-            else:
-                one_direction = random.choice([True, False])
-                if one_direction:
-                    instructions = generate_turn_directions(n)
-                # Two directions
-                else:
-                    instructions = generate_two_turn_directions(num)
-        else:
-            for i in range(num):
-                instruction = generate_instruction(i, face_forward)
-                location.update(instruction)
-                if i == num - 1:
-                    if location.end_at_origin():
-                        end_at_origin = True
-                instructions.append(instruction)
-    if num in rest:
-        if end_at_origin:
-            import pickle
-            n_sentences_filtered = pickle.load(open('n_sentences_filtered.pkl', 'rb'))
+                end_at_origin = True
+                dirs = ['left', 'right', 'around']
+                new_instruction = [turn(random.choice(dirs)) for i in range(to_remove)]
+                instructions.extend(new_instruction)
+    else:
+        if location.end_at_origin():
+            end_at_origin = True
 
-            import random
-            key = num
-            instruction = random.choices(list(n_sentences_filtered[key].keys()), weights=[v[0] for v in n_sentences_filtered[key].values()], k=1)[0]
-            number_options = n_sentences_filtered[key][instruction][1]
-            number_options = random.choice(number_options)
-            number_options = [int(x) for x in number_options.split('-')]
-            not_one = [x for x in number_options if x != 1]
-            m = min(not_one)
-            start = m - 2
-            m = max(not_one)
-            end = 10 - m
-            sub = random.randint(-start, end)
-            number_options = [x + sub for x in number_options if x != 1]
-            for n in number_options:
-                instruction = instruction.replace('n', str(n), 1)
-            instructions = instruction.split('.')
-        else:
-            for i in range(num):
-                instruction = generate_instruction(i, face_forward)
-                location.update(instruction)
-                if i == num - 1:
-                    if location.end_at_origin():
-                        end_at_origin = True
-                instructions.append(instruction)
     location.reset()
     if add_cot:
-        cot.append("Let's think step by step. \nWe start at the origin (0, 0), facing the positive y-axis.")
+        cot.append("(0, 0, 0).")
         for i in instructions:
             location.update(i)
-            cot.append(f'{i} {str(location)}')
+            cot.append(f'{str(location)}')
 
-        if end_at_origin:
-            cot.append('Since (0, 0) is (0, 0), we are indeed where we started. So the answer is Yes.\n')
-        else:
-            cot.append(f'Since ({location.x}, {location.y}) is not (0, 0), we are not where we started. So the answer is No.\n')
-
-
-    # Combine the statements into the problem
     problem = "\n".join(instructions) + "\n"
     cot = "\n".join(cot) + "\n"
     answer = 'Yes' if end_at_origin else 'No'
     if add_cot:
         return (prefix + problem, cot + 'Answer: ' + answer)
     else:
-        return (prefix + problem, 'Answer: ' + answer)            
-
-
-# -
+        return (prefix + problem, 'Answer: ' + answer)
 
 def get_batch(batch_size=16, num=5, add_cot=False):
     problems = []
@@ -601,15 +590,7 @@ def get_batch(batch_size=16, num=5, add_cot=False):
     for i in range(batch_size):
         ffi = ff[i]
         end_at_origini = end_at_origin[i]
-        problem = None
-        while problem is None:
-            try:
-                problem, answer = generate_problem(num, add_cot, ffi, end_at_origini)
-            except ValueError:
-                pass
-            else:
-                break
-        #problem, answer = generate_problem(num, add_cot, ff.pop(), end_at_origin.pop())
+        problem, answer = generate_problem(num, add_cot, ffi, end_at_origini)
         problems.append(problem)
         answers.append(answer)
     return problems, answers
@@ -632,21 +613,23 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
         "weight_decay": weight_decay,
         "use_cot": use_cot
     }
-    wandb.init(project="nav", config=config)
-    print(wandb.run.id)
+    
     if info:
+        wandb.init(project="nav", config=config)
+        print(wandb.run.id)
         # change run name to include num, num_steps, batch_size, architecture, learning_rate, weight_decay, use_cot
         wandb.run.name = f'{info}_num{num}_steps{num_steps}_batch{batch_size}_arch{architecture.split("/")[-1]}_lr{learning_rate}_wd{weight_decay}'
-    print(config)
+        print(config)
 
     # Set up logging
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     # Generate and print a sample problem
-    sample_problem = generate_problem(num, use_cot)
+    sample_problem = generate_problem(num=num, add_cot=use_cot)
     sample_str = sample_problem[0] + '\n' + sample_problem[1]
     logging.info(f"Sample problem:\n{sample_str}")
-    wandb.log({"sample_problem": sample_str})
+    if info:
+        wandb.log({"sample_problem": sample_str})
 
     model_name = architecture
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -657,7 +640,8 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
     num_params = sum(p.numel() for p in model.parameters())
     formatted_params = f"{num_params / 1e6:.1f}M" if num_params < 1e9 else f"{num_params / 1e9:.1f}B"
     logging.info(f"Number of model parameters: {formatted_params}")
-    wandb.log({"num_parameters": num_params, "formatted_num_parameters": formatted_params})
+    if info:
+        wandb.log({"num_parameters": num_params, "formatted_num_parameters": formatted_params})
 
     CUDA = torch.cuda.is_available()
     if CUDA:
@@ -715,12 +699,13 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
 
         accuracy = compute_accuracy(logits, labels)
 
-        # Log metrics to wandb
-        wandb.log({
-            "loss": loss.item(),
-            "accuracy": accuracy.item() if isinstance(accuracy, torch.Tensor) else accuracy,
-            "learning_rate": scheduler.get_last_lr()[0]
-        })
+        if info:
+            # Log metrics to wandb
+            wandb.log({
+                "loss": loss.item(),
+                "accuracy": accuracy.item() if isinstance(accuracy, torch.Tensor) else accuracy,
+                "learning_rate": scheduler.get_last_lr()[0]
+            })
 
         if step % 10 == 0 and step > 0:
             progress_bar.set_postfix({'Loss': f'{loss.item():.4f}', 'Accuracy': f'{accuracy:.4f}'})
@@ -742,11 +727,13 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
     with open(filename, 'wb') as f:
         pickle.dump(results, f)
 
-    wandb.save(filename)
+    if info:
+        wandb.save(filename)
+        # Finish the wandb run
+        wandb.finish()
     progress_bar.set_postfix_str("Training completed. Results saved to wandb and local file.")
 
-    # Finish the wandb run
-    wandb.finish()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train model on nav problem")
