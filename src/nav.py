@@ -254,11 +254,11 @@ class Location:
     def end_at_origin(self):
         return self.x == 0 and self.y == 0
 
-    # def __str__(self):
-    #     return f'({self.x}, {self.y}), {self.print_heading()}.'
-
     def __str__(self):
-        return f'({self.x}, {self.y}, {self.heading}).'
+        return f'({self.x}, {self.y}), {self.print_heading()}.'
+
+    # def __str__(self):
+    #     return f'({self.x}, {self.y}, {self.heading}).'
     
     def reset(self):
         self.x = 0
@@ -568,10 +568,10 @@ def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=Fals
 
     location.reset()
     if add_cot:
-        cot.append("(0, 0, 0).")
+        cot.append("We start at the origin, (0, 0, 0).")
         for i in instructions:
             location.update(i)
-            cot.append(f'{str(location)}')
+            cot.append(f'{i} {str(location)}')
 
     problem = "\n".join(instructions) + "\n"
     cot = "\n".join(cot) + "\n"
@@ -618,7 +618,7 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
         wandb.init(project="nav", config=config)
         print(wandb.run.id)
         # change run name to include num, num_steps, batch_size, architecture, learning_rate, weight_decay, use_cot
-        wandb.run.name = f'{info}_num{num}_steps{num_steps}_batch{batch_size}_arch{architecture.split("/")[-1]}_lr{learning_rate}_wd{weight_decay}'
+        wandb.run.name = f'{info}_cot{use_cot}_num{num}_steps{num_steps}_arch{architecture.split("/")[-1]}_lr{learning_rate}'
         print(config)
 
     # Set up logging
@@ -745,6 +745,7 @@ if __name__ == "__main__":
     parser.add_argument("--weight_decay", type=float, default=0.1, help="Weight decay for optimizer")
     parser.add_argument("--use_cot", action="store_true", help="Use the 'Cot' statement in the problem")
     parser.add_argument("--info", type=str, help="Use info in wandb name")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     args = parser.parse_args()
     
     main(args.num, args.num_steps, args.batch_size, args.architecture, args.learning_rate, args.weight_decay, args.use_cot, args.info)
