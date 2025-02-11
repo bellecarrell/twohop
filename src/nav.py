@@ -50,11 +50,12 @@ def step(step, direction=None):
         return f'Take {step} steps {direction}.' 
 
 class Location:
-    def __init__(self, x=0, y=0, heading=0, face_forward=False):
+    def __init__(self, x=0, y=0, heading=0, face_forward=False, max_distance=10):
         self.x = x
         self.y = y
         self.heading = heading
         self.face_forward = face_forward
+        self.max_distance = max_distance
     
     def update(self, instruction, verbose=False):
 
@@ -266,7 +267,7 @@ class Location:
         self.heading = 0
 
     def valid(self):
-        return self.x <= 10 and self.x >= -10 and self.y <= 10 and self.y >= -10
+        return self.x <= self.max_distance and self.x >= -self.max_distance and self.y <= self.max_distance and self.y >= -self.max_distance
 
 # +
 def generate_reverse_direction(direction):
@@ -337,7 +338,7 @@ def validate_instruction(instruction, location, same_distance=False, verbose=Fal
             return False
     return location_copy.valid()
 
-def generate_instruction(i=0, face_forward=True, end_at_origin=False):
+def generate_instruction(i=0, face_forward=True, end_at_origin=False, max_distance=10):
     if face_forward:
         if i == 0:
             instruction = 'Always face forward.'
@@ -354,7 +355,7 @@ def generate_instruction(i=0, face_forward=True, end_at_origin=False):
         if turn:
             instruction = random.choice(['Turn left.', 'Turn right.', 'Turn around.'])
         else:
-            steps = random.randint(1, 10)
+            steps = random.randint(1, max_distance)
             if steps == 1:
                 instruction = f'Take 1 step.'
             else:
@@ -500,12 +501,12 @@ def generate_instruction_same_dist_to_origin(i, location):
 
     return instruction
 
-def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=False):
+def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=False, max_distance=10, max_steps=10):
     import random
 
     prefix = 'Question: If you follow these instructions, do you return to the starting point?\n'
     ff = 'Always face forward.'
-    location = Location(face_forward=face_forward)
+    location = Location(face_forward=face_forward, max_distance=max_distance)
     instructions = []
     cot = []
     remaining = num
@@ -514,9 +515,9 @@ def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=Fals
     while remaining > 0:
         instr_added = 1
 
-        instruction = generate_instruction(i, face_forward)
+        instruction = generate_instruction(i, face_forward, max_distance=max_steps)
         while not validate_instruction(instruction, location):
-            instruction = generate_instruction(i, face_forward)
+            instruction = generate_instruction(i, face_forward, max_distance=max_steps)
         
         remaining -= instr_added
         i += instr_added
