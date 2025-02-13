@@ -501,10 +501,13 @@ def generate_instruction_same_dist_to_origin(i, location):
 
     return instruction
 
-def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=False, max_distance=10, max_steps=10):
+def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=False, max_distance=10, max_steps=10, multiclass=False):
     import random
 
     prefix = 'Question: If you follow these instructions, do you return to the starting point?\n'
+    if multiclass:
+        prefix = 'Question: If you follow these instructions, what is your location?\n'
+
     ff = 'Always face forward.'
     location = Location(face_forward=face_forward, max_distance=max_distance)
     instructions = []
@@ -577,21 +580,27 @@ def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=Fals
     problem = "\n".join(instructions) + "\n"
     cot = "\n".join(cot) + "\n"
     answer = 'Yes' if end_at_origin else 'No'
+    if multiclass:
+        answer = f'({location.x}, {location.y})'
+
     if add_cot:
         return (prefix + problem, cot + 'Answer: ' + answer)
     else:
         return (prefix + problem, 'Answer: ' + answer)
 
-def get_batch(batch_size=16, num=5, add_cot=False):
+def get_batch(batch_size=16, num=5, add_cot=False, max_distance=10, max_steps=10, multiclass=False):
     problems = []
     answers = []
     # generate batch random coin flips for face forward
     ff = [random.choice([True, False]) for _ in range(batch_size)]
     end_at_origin = [random.choice([True, False]) for _ in range(batch_size)]
+    if multiclass:
+        end_at_origin = [False for _ in range(batch_size)]
+
     for i in range(batch_size):
         ffi = ff[i]
         end_at_origini = end_at_origin[i]
-        problem, answer = generate_problem(num, add_cot, ffi, end_at_origini)
+        problem, answer = generate_problem(num, add_cot, ffi, end_at_origini, max_distance=max_distance, max_steps=max_steps, multiclass=multiclass)
         problems.append(problem)
         answers.append(answer)
     return problems, answers
@@ -602,7 +611,7 @@ def compute_accuracy(logits, labels):
     example_correct = torch.all(correct, dim=-1)
     return example_correct.float().mean()
 
-def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, use_cot=False, info=False):
+def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, use_cot=False, info=False, max_distance=10, max_steps=10, multiclass=False):
 
     # Initialize wandb
     config = {
@@ -662,7 +671,7 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
 
     progress_bar = tqdm(range(num_steps), desc="Training", ncols=100)
     for step in progress_bar:
-        problem_batch, answer_batch = get_batch(batch_size=batch_size, num=num, add_cot=use_cot)
+        problem_batch, answer_batch = get_batch(batch_size=batch_size, num=num, add_cot=use_cot, max_distance=max_distance, max_steps=max_steps, multiclass=multiclass)
         tokenized_problems = tokenizer(problem_batch)
         tokenized_answers = tokenizer(answer_batch)
         tokenized_batch = {'input_ids': [], 'attention_mask': [], 'loss_mask': []}
@@ -747,6 +756,9 @@ if __name__ == "__main__":
     parser.add_argument("--use_cot", action="store_true", help="Use the 'Cot' statement in the problem")
     parser.add_argument("--info", type=str, help="Use info in wandb name")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    parser.add_argument("--max_steps", type=int, default=10, help="Max number of steps in a single instruction")
+    parser.add_argument("--max_distance", type=int, default=10, help="Max distance from origin")
+    parser.add_argument("--multiclass", action="store_true", help="Use multiclass classification")
     args = parser.parse_args()
     
-    main(args.num, args.num_steps, args.batch_size, args.architecture, args.learning_rate, args.weight_decay, args.use_cot, args.info)
+    main(args.num, args.num_steps, args.batch_size, args.architecture, args.learning_rate, args.weight_decay, args.use_cot, args.info, args.max_distance, args.max_steps, args.multiclass)
