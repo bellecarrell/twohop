@@ -51,7 +51,7 @@ p = inflect.engine()
 def get_counting_word(word: str, number: int) -> str:
   is_vowel = word[0] in "aeiou"
   article = "an" if is_vowel else "a"
-  return [article, "two", "three", "four", "five"][number - 1]
+  return [article, "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"][number - 1]
 
 
 def add_and(items: List[str]) -> List[str]:
@@ -65,7 +65,9 @@ def add_count(items: List[str]) -> int:
 
   for i in range(len(items)):
     word = items[i]
-    number = random.choices([1, 2, 3, 4, 5], weights=[80, 10, 6, 3, 1])[0]
+    #number = random.choices([1, 2, 3, 4, 5], weights=[80, 10, 6, 3, 1])[0]
+    # vary weight number = random.choices([1, 2, 3, 4, 5], weights=[60, 20, 12, 6, 2])[0]
+    number = random.choices([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])[0]
     counting_word = get_counting_word(word, number)
     word = p.plural(word, number)
 
@@ -94,7 +96,8 @@ def make_example(k=None):
   counts = add_count(items)
   items_list = copy.deepcopy(items)
   count = sum(counts.values())
-  if random.random() > 0.75 and kind != "objects":
+  if random.random() > 0.50 and kind != "objects":
+    #if random.random() > 0.75 and kind != "objects":
     items = add_decoy(items, kind)
   add_and(items)
   items = ", ".join(items)
@@ -160,7 +163,7 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
     }
     
     if info:
-        wandb.init(project="nav", config=config)
+        wandb.init(project="obj_count", config=config)
         print(wandb.run.id)
         # change run name to include num, num_steps, batch_size, architecture, learning_rate, weight_decay, use_cot
         wandb.run.name = f'{info}_cot{use_cot}_num{num}_steps{num_steps}_arch{architecture.split("/")[-1]}_lr{learning_rate}'

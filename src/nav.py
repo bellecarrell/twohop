@@ -7,7 +7,7 @@ import logging
 from tqdm import tqdm
 from transformers import AutoTokenizer, GPT2LMHeadModel, get_linear_schedule_with_warmup, AutoModelForCausalLM
 import wandb
-
+import math
 import names
 import random
 
@@ -501,8 +501,12 @@ def generate_instruction_same_dist_to_origin(i, location):
 
     return instruction
 
-def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=False, max_distance=10, max_steps=10, multiclass=False):
-    import random
+def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=False, max_distance=10, max_steps=10, multiclass=None):
+    max_distance = 10
+    max_steps = 10
+    
+    if not multiclass:
+        multiclass = True
 
     prefix = 'Question: If you follow these instructions, do you return to the starting point?\n'
     if multiclass:
@@ -540,42 +544,45 @@ def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=Fals
     NO_FF_TO_ORIGIN = 4
     instr_to_origin = {True: FF_TO_ORIGIN, False: NO_FF_TO_ORIGIN}
 
-    if end_at_origin:
-        if not location.end_at_origin():
-            # Get min of instr_to_origin or len of instructions
-            to_remove = min(instr_to_origin[face_forward], len(instructions))
-            instructions = instructions[:-to_remove]
+    # if end_at_origin:
+    #     if not location.end_at_origin():
+    #         # Get min of instr_to_origin or len of instructions
+    #         to_remove = min(instr_to_origin[face_forward], len(instructions))
+    #         instructions = instructions[:-to_remove]
 
-            location.reset()
-            for i in instructions:
-                location.update(i)
+    #         location.reset()
+    #         for i in instructions:
+    #             location.update(i)
             
-            if not location.end_at_origin():
-                new_instruction = location.go_to_origin()
-                if type(new_instruction) == str:
-                    new_instruction = [new_instruction]
-                instructions.extend(new_instruction)
+    #         if not location.end_at_origin():
+    #             new_instruction = location.go_to_origin()
+    #             if type(new_instruction) == str:
+    #                 new_instruction = [new_instruction]
+    #             instructions.extend(new_instruction)
 
-                if len(new_instruction) != to_remove:
-                    remaining = to_remove - len(new_instruction)
-                    dirs = ['left', 'right', 'around']
-                    new_instruction = [turn(random.choice(dirs)) for i in range(remaining)]
-                    instructions.extend(new_instruction)
-            else:
-                end_at_origin = True
-                dirs = ['left', 'right', 'around']
-                new_instruction = [turn(random.choice(dirs)) for i in range(to_remove)]
-                instructions.extend(new_instruction)
-    else:
-        if location.end_at_origin():
-            end_at_origin = True
+    #             if len(new_instruction) != to_remove:
+    #                 remaining = to_remove - len(new_instruction)
+    #                 dirs = ['left', 'right', 'around']
+    #                 new_instruction = [turn(random.choice(dirs)) for i in range(remaining)]
+    #                 instructions.extend(new_instruction)
+    #         else:
+    #             end_at_origin = True
+    #             dirs = ['left', 'right', 'around']
+    #             new_instruction = [turn(random.choice(dirs)) for i in range(to_remove)]
+    #             instructions.extend(new_instruction)
+    # else:
+    #     if location.end_at_origin():
+    #         end_at_origin = True
 
     location.reset()
-    if add_cot:
-        cot.append("We start at the origin, (0, 0, 0).")
-        for i in instructions:
-            location.update(i)
-            cot.append(f'{i} {str(location)}')
+
+    cot.append("We start at the origin, (0, 0, 0).")
+    for i, instr in enumerate(instructions):
+        location.update(instr)
+        if i != len(instructions) - 1:
+            cot.append(f'{instr} {str(location)}')
+        else:
+            cot.append(f'{instr}')
 
     problem = "\n".join(instructions) + "\n"
     cot = "\n".join(cot) + "\n"
@@ -584,12 +591,13 @@ def generate_problem(num=4, add_cot=False, face_forward=True, end_at_origin=Fals
         answer = f'({location.x}, {location.y})'
 
     if add_cot:
-        return (prefix + problem, cot + 'Answer: ' + answer)
+        return (prefix + problem, cot, 'Answer: ' + answer)
     else:
-        return (prefix + problem, 'Answer: ' + answer)
+        return (prefix + problem, '', 'Answer: ' + answer)
 
 def get_batch(batch_size=16, num=5, add_cot=False, max_distance=10, max_steps=10, multiclass=False):
     problems = []
+    cots = []
     answers = []
     # generate batch random coin flips for face forward
     ff = [random.choice([True, False]) for _ in range(batch_size)]
@@ -600,18 +608,62 @@ def get_batch(batch_size=16, num=5, add_cot=False, max_distance=10, max_steps=10
     for i in range(batch_size):
         ffi = ff[i]
         end_at_origini = end_at_origin[i]
-        problem, answer = generate_problem(num, add_cot, ffi, end_at_origini, max_distance=max_distance, max_steps=max_steps, multiclass=multiclass)
+        problem, cot, answer = generate_problem(num, add_cot, ffi, end_at_origini, max_distance=max_distance, max_steps=max_steps, multiclass=multiclass)
         problems.append(problem)
         answers.append(answer)
-    return problems, answers
+        cots.append(cot)
+    return problems, cots, answers
 
-def compute_accuracy(logits, labels):
+def compute_accuracy(logits, labels, tokenizer):
     predictions = torch.argmax(logits, dim=-1)
     correct = (predictions == labels) | (labels == -100)
     example_correct = torch.all(correct, dim=-1)
     return example_correct.float().mean()
 
-def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, use_cot=False, info=False, max_distance=10, max_steps=10, multiclass=False):
+def compute_accuracy_answer_only(logits, labels, tokenizer, logstep=False):
+    predictions = torch.argmax(logits, dim=-1)
+    predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+    labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+    total = len(labels)
+    correct = 0
+    for i in range(total):
+        prediction = extract_answer(predictions[i], tokenizer)
+        label = extract_answer(labels[i], tokenizer)
+        # prediction = predictions[i]
+        # label = f'{cot[i]} {answer[i]}'
+        # prediction = prediction.replace('\n', ' ')
+        # label = label.replace('\n', ' ')
+        if logstep and i == 0:
+            print(f'Prediction: {prediction}')
+            print(f'Label: {label}')
+        if label in prediction:
+            correct += 1
+    if logstep:
+        print(f'acc: {correct}/{total}')
+    return correct / total
+
+def extract_answer(text, tokenizer):
+    #text = tokenizer.decode(tensor, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+    text = text.split('Answer:')[-1]
+    answer = text.strip()
+    return answer
+
+
+def compute_lambda_distribution(removal_smoothing_lambda, truncate_length=100):
+    if removal_smoothing_lambda == float('inf'):
+        lambda_distribution = torch.zeros(truncate_length)
+        lambda_distribution[0] = 1
+    else:
+        positions = torch.arange(truncate_length)
+        lambda_distribution = (1 - math.exp(-removal_smoothing_lambda)) * positions.mul(-removal_smoothing_lambda).exp()
+        cum_prob = lambda_distribution.sum()
+        assert cum_prob <= 1
+        lambda_distribution[-1] = lambda_distribution[-1] + (1-cum_prob)
+    return lambda_distribution
+
+def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, use_cot=False, info=False, max_distance=10, max_steps=10, multiclass=False, seed=42, removal_smoothing_lambda=float('inf'), remove_cot=False, examples_per_removed_token=1000, pause_token='', answer_only=False, tokens_removed_per=1, dummy=False):
+
+    keep_last_step = False
 
     # Initialize wandb
     config = {
@@ -621,25 +673,33 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
         "architecture": architecture,
         "learning_rate": learning_rate,
         "weight_decay": weight_decay,
-        "use_cot": use_cot
+        "use_cot": use_cot, 
+        "examples_per_removed_token": examples_per_removed_token,
+        "removal_smoothing_lambda": removal_smoothing_lambda, 
+        "keep_last_step": keep_last_step,
     }
     
     if info:
         wandb.init(project="nav", config=config)
         print(wandb.run.id)
         # change run name to include num, num_steps, batch_size, architecture, learning_rate, weight_decay, use_cot
-        wandb.run.name = f'{info}_cot{use_cot}_num{num}_steps{num_steps}_arch{architecture.split("/")[-1]}_lr{learning_rate}'
+        wandb.run.name = f'{info}_cot{use_cot}_num{num}_remove{examples_per_removed_token}_steps{num_steps}_tokens{tokens_removed_per}'
         print(config)
 
     # Set up logging
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    verbose = False
 
     # Generate and print a sample problem
-    sample_problem = generate_problem(num=num, add_cot=use_cot)
-    sample_str = sample_problem[0] + '\n' + sample_problem[1]
+    sample_problem = generate_problem(num=num, add_cot=use_cot, multiclass=multiclass)
+    sample_str = sample_problem[0] + '\n' + sample_problem[1] + '\n' + sample_problem[2]
     logging.info(f"Sample problem:\n{sample_str}")
     if info:
         wandb.log({"sample_problem": sample_str})
+
+    # Set random seed for reproducibility
+    random.seed(seed)
+    torch.manual_seed(seed)
 
     model_name = architecture
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -667,23 +727,96 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
 
     criterion = torch.nn.CrossEntropyLoss(ignore_index=-100)
 
-    num_true = 0
+    if examples_per_removed_token > 0:
+        remove_cot = True
+
+    if remove_cot:
+        steps_per_removal = examples_per_removed_token // batch_size
+        lambda_distribution = compute_lambda_distribution(removal_smoothing_lambda)
+        scheduled_to_remove = 0
+        all_cot_removed_in_prev_batch = False
+        logging.info("remove_cot is True. Removing cot tokens during training.")
 
     progress_bar = tqdm(range(num_steps), desc="Training", ncols=100)
-    for step in progress_bar:
-        problem_batch, answer_batch = get_batch(batch_size=batch_size, num=num, add_cot=use_cot, max_distance=max_distance, max_steps=max_steps, multiclass=multiclass)
+    for i ,step in enumerate(progress_bar):
+        if remove_cot:
+            prev_scheduled_to_remove = scheduled_to_remove
+            scheduled_to_remove = i // steps_per_removal
+            random_removal_offset = torch.multinomial(lambda_distribution, batch_size, replacement=True) 
+            reset_opt = False
+            reset_step = 0
+            to_remove = scheduled_to_remove + random_removal_offset
+            if scheduled_to_remove > prev_scheduled_to_remove:
+                print(f" -step {step}. removing: {scheduled_to_remove * tokens_removed_per}")
+                if (not all_cot_removed_in_prev_batch):
+                    print ('RESETTING OPTIMIZER')
+                    optimizer.zero_grad(set_to_none=True)
+                    del optimizer
+                    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+                    reset_opt = True
+                    reset_step = step
+
+        problem_batch, cot_batch, answer_batch = get_batch(batch_size=batch_size, num=num, add_cot=use_cot, max_distance=max_distance, max_steps=max_steps, multiclass=multiclass)
+        
+        if pause_token != 0 and use_cot:
+            for i in range(len(cot_batch)):
+                cot_batch[i] = ''.join(['<pause>' for _ in range(pause_token)])
+        
         tokenized_problems = tokenizer(problem_batch)
+        tokenized_cots = tokenizer(cot_batch)
+
         tokenized_answers = tokenizer(answer_batch)
         tokenized_batch = {'input_ids': [], 'attention_mask': [], 'loss_mask': []}
+        all_cot_removed_in_batch = False
+        len_cot = 0
         for i in range(len(tokenized_problems['input_ids'])):
             problem_input_ids = torch.tensor(tokenized_problems['input_ids'][i])
             problem_attention_mask = torch.tensor(tokenized_problems['attention_mask'][i])
+            cot_input_ids = torch.tensor(tokenized_cots['input_ids'][i])
+            cot_attention_mask = torch.tensor(tokenized_cots['attention_mask'][i])
             answer_input_ids = torch.tensor(tokenized_answers['input_ids'][i])
             answer_attention_mask = torch.tensor(tokenized_answers['attention_mask'][i])
+            len_cot = len(cot_input_ids)
+
+            if remove_cot:
+                to_remove[i] = to_remove[i] * tokens_removed_per
+                if to_remove[i] > 0:
+                    if keep_last_step and ((len(cot_input_ids) - to_remove[i]) < tokens_removed_per):
+                        to_remove[i] = len(cot_input_ids) - tokens_removed_per
+                        
+                    # print(f'len cot_input_ids: {len(cot_input_ids)}')
+                    # print(f'to_remove: {to_remove[i]}')
+                    # print(f'len cot_input_ids[to_remove[i]:]: {len(cot_input_ids[to_remove[i]:])}')
+                    cot_input_ids = cot_input_ids[to_remove[i]:]
+                    cot_attention_mask = cot_attention_mask[to_remove[i]:]
+
+                    answer_input_ids = torch.cat([cot_input_ids, answer_input_ids])
+                    answer_attention_mask = torch.cat([cot_attention_mask, answer_attention_mask])
+                else:
+                    answer_input_ids = torch.cat([cot_input_ids, answer_input_ids])
+                    answer_attention_mask = torch.cat([cot_attention_mask, answer_attention_mask])
+                if to_remove[i] >= len(cot_input_ids):
+                    all_cot_removed_in_batch = True
+                tokenized_cots['input_ids'][i] = cot_input_ids
+                tokenized_cots['attention_mask'][i] = cot_attention_mask
+                      
+            else:
+                if use_cot:
+                    answer_input_ids = torch.cat([cot_input_ids, answer_input_ids])
+                    answer_attention_mask = torch.cat([cot_attention_mask, answer_attention_mask])
+
             tokenized_batch['input_ids'].append(torch.cat([problem_input_ids, answer_input_ids]))
             tokenized_batch['attention_mask'].append(torch.cat([problem_attention_mask, answer_attention_mask]))
             tokenized_batch['loss_mask'].append(torch.cat([torch.zeros_like(problem_input_ids), torch.ones_like(answer_input_ids)]))
         
+        
+        if remove_cot and reset_opt:
+            print(f'len cot input ids: {len_cot}')
+
+        all_cot_removed_in_prev_batch = all_cot_removed_in_batch
+        if all_cot_removed_in_batch and dummy:
+            verbose = True
+
         batch_max_length = max([len(x) for x in tokenized_batch['input_ids']])
         for k in tokenized_batch.keys():
             for i in range(len(tokenized_batch[k])):
@@ -697,6 +830,30 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
         preds = model(tokenized_batch['input_ids'], attention_mask=tokenized_batch['attention_mask'])
         logits = preds.logits[:, :-1, :]
         labels = tokenized_batch["input_ids"][:, 1:]
+
+
+        logstep = False
+        # if (all_cot_removed_in_batch and dummy and i % 100 == 0) or (i % 500 == 0):
+        if (dummy and step % 50 == 0 and remove_cot) or (dummy and remove_cot and step > 700 and step < 1100 and step % 10 == 0):
+            p = torch.argmax(logits, dim=-1)
+            p = tokenizer.batch_decode(p, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+            els = tokenizer.batch_decode(labels, skip_special_tokens=True)
+            probs = tokenizer.batch_decode(tokenized_problems['input_ids'], skip_special_tokens=True)
+            cot = tokenizer.batch_decode(tokenized_cots['input_ids'], skip_special_tokens=True)
+            answer = tokenizer.batch_decode(tokenized_answers['input_ids'], skip_special_tokens=True)
+            with open(f'{num}_{info}_predictions.txt', 'a') as f:
+                f.write('--------------------------------------------------\n')
+                # f.write(f'Last reset opt step: {reset_step}\n\n')
+                f.write(f'Step: {step}\n\n')
+                f.write(f'Problem: {probs[0]}\n\n')
+                f.write(f'COT + answer: {cot[0]} {answer[0]}\n\n')
+                f.write(f'Prediction: {p[0]}\n\n')
+                f.write('\n')
+            logstep = True
+
+        if answer_only:
+            accuracy = compute_accuracy_answer_only(logits, labels, tokenizer, logstep=logstep)
+
         rel = rel[:, 1:]
         labels = torch.where(rel, labels, -100)
         loss = criterion(logits.reshape(-1, preds.logits.shape[-1]), labels.reshape(-1))
@@ -707,7 +864,8 @@ def main(num, num_steps, batch_size, architecture, learning_rate, weight_decay, 
         scheduler.step()
         optimizer.zero_grad()
 
-        accuracy = compute_accuracy(logits, labels)
+        if not answer_only: 
+            accuracy = compute_accuracy(logits, labels, tokenizer)
 
         if info:
             # Log metrics to wandb
@@ -759,6 +917,14 @@ if __name__ == "__main__":
     parser.add_argument("--max_steps", type=int, default=10, help="Max number of steps in a single instruction")
     parser.add_argument("--max_distance", type=int, default=10, help="Max distance from origin")
     parser.add_argument("--multiclass", action="store_true", help="Use multiclass classification")
+    parser.add_argument('--removal_smoothing_lambda', type=float, default=float('inf'))
+    parser.add_argument('--remove_cot', action='store_true')
+    parser.add_argument('--examples_per_removed_token', type=int, default=0)
+    parser.add_argument('--pause_token', type=int, default=0)
+    parser.add_argument('--answer_only', action='store_true')
+    parser.add_argument('--tokens_removed_per', type=int, default=0)
+    parser.add_argument('--dummy', action='store_true')
+
     args = parser.parse_args()
     
-    main(args.num, args.num_steps, args.batch_size, args.architecture, args.learning_rate, args.weight_decay, args.use_cot, args.info, args.max_distance, args.max_steps, args.multiclass)
+    main(args.num, args.num_steps, args.batch_size, args.architecture, args.learning_rate, args.weight_decay, args.use_cot, args.info, args.max_distance, args.max_steps, args.multiclass, args.seed, args.removal_smoothing_lambda, args.remove_cot, args.examples_per_removed_token, args.pause_token, args.answer_only, args.tokens_removed_per, args.dummy)
